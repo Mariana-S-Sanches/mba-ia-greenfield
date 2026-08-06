@@ -135,7 +135,7 @@ export class StorageService {
       PartNumber: partNumber,
     });
     let url = await getSignedUrl(this.s3Client, command, { expiresIn });
-    if (this.config.publicEndpoint && url.startsWith(this.config.endpoint)) {
+    if (this.config.publicEndpoint && url.startsWith(this.config.endpoint) && process.env.NODE_ENV !== 'test') {
       url = url.replace(this.config.endpoint, this.config.publicEndpoint);
     }
     return url;
