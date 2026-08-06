@@ -7,8 +7,14 @@ export default registerAs('storage', () => {
     ? rawEndpoint
     : `http://${rawEndpoint}:${port}`;
 
+  const publicRawEndpoint = process.env.MINIO_PUBLIC_ENDPOINT || 'localhost';
+  const publicEndpoint = publicRawEndpoint.startsWith('http')
+    ? publicRawEndpoint
+    : `http://${publicRawEndpoint}:${port}`;
+
   return {
     endpoint,
+    publicEndpoint,
     accessKey: process.env.MINIO_ACCESS_KEY || 'minioadmin',
     secretKey: process.env.MINIO_SECRET_KEY || 'minioadmin',
     bucket: process.env.MINIO_BUCKET || 'streamtube',
