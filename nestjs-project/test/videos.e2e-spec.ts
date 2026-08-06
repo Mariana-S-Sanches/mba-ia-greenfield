@@ -110,4 +110,56 @@ describe('VideosController (e2e)', () => {
 
     expect(completeRes.body.status).toBe('PROCESSING');
   });
+
+  describe('Video Playback and Download', () => {
+    let readyReferenceId: string;
+
+    beforeEach(async () => {
+      const fileKey = 'test-videos/ready-video.mp4';
+      await storageService.putObject(fileKey, Buffer.from('dummy video content for streaming'), 'video/mp4');
+
+      const channelRes = await dataSource.query(`SELECT id FROM channels WHERE nickname = 'test-channel'`);
+      const channelId = channelRes[0].id;
+
+      const videoRes = await dataSource.query(`
+        INSERT INTO videos (title, description, status, "channelId", "fileKey", "referenceId")
+        VALUES ('Ready Video', 'Ready desc', 'READY', $1, $2, 'ref123')
+        RETURNING id, "referenceId"
+      `, [channelId, fileKey]);
+
+      readyReferenceId = videoRes[0].referenceId;
+    });
+
+    it('/videos/:id (GET) - Get video metadata', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/videos/${readyReferenceId}`)
+        .expect(200);
+
+      expect(res.body.title).toBe('Ready Video');
+      expect(res.body.status).toBe('READY');
+    });
+
+    it('/videos/:id/stream (GET) - Stream video with Range header', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/videos/${readyReferenceId}/stream`)
+        .set('Range', 'bytes=0-10')
+        .expect(206);
+
+      expect(res.headers['content-range']).toBeDefined();
+      expect(res.headers['accept-ranges']).toBe('bytes');
+      expect(res.headers['content-type']).toBe('video/mp4');
+      expect(res.text).toBe('dummy video'); // 11 bytes "dummy video"
+    });
+
+    it('/videos/:id/download (GET) - Download video', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/videos/${readyReferenceId}/download`)
+        .expect(200);
+
+      expect(res.headers['content-disposition']).toContain('attachment');
+      expect(res.headers['content-disposition']).toContain('filename="ready_video.mp4"');
+      expect(res.headers['content-type']).toBe('video/mp4');
+      expect(res.text).toBe('dummy video content for streaming');
+    });
+  });
 });

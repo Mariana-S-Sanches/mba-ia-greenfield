@@ -99,4 +99,52 @@ export class VideosService {
       status: video.status,
     };
   }
+
+  async getVideoMetadata(referenceId: string) {
+    const video = await this.videoRepo.findOne({
+      where: { referenceId },
+    });
+
+    if (!video) throw new NotFoundException('Video not found');
+
+    return {
+      title: video.title,
+      description: video.description,
+      duration: video.duration,
+      status: video.status,
+      thumbnailKey: video.thumbnailKey,
+    };
+  }
+
+  async getVideoStream(referenceId: string, range?: string) {
+    const video = await this.videoRepo.findOne({
+      where: { referenceId },
+    });
+
+    if (!video) throw new NotFoundException('Video not found');
+    if (!video.fileKey) throw new BadRequestException('Video file not available');
+    // We allow streaming if READY. Could allow PROCESSING if part of the file is there but let's restrict to READY.
+    if (video.status !== VideoStatus.READY && video.status !== VideoStatus.PROCESSING) {
+       // Wait, req says "download dos vídeos já processados". We should restrict to READY
+    }
+    if (video.status !== VideoStatus.READY) throw new BadRequestException('Video is not ready');
+
+    return this.storageService.getObjectStream(video.fileKey, range);
+  }
+
+  async getVideoDownload(referenceId: string) {
+    const video = await this.videoRepo.findOne({
+      where: { referenceId },
+    });
+
+    if (!video) throw new NotFoundException('Video not found');
+    if (!video.fileKey) throw new BadRequestException('Video file not available');
+    if (video.status !== VideoStatus.READY) throw new BadRequestException('Video is not ready');
+
+    const streamData = await this.storageService.getObjectStream(video.fileKey);
+    return {
+      title: video.title,
+      stream: streamData.stream,
+    };
+  }
 }

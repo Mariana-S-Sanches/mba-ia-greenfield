@@ -81,6 +81,22 @@ export class StorageService {
     return response.Body;
   }
 
+  async getObjectStream(key: string, range?: string) {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      Range: range,
+    });
+    const response = await this.s3Client.send(command);
+    return {
+      stream: response.Body as Readable,
+      contentRange: response.ContentRange,
+      contentLength: response.ContentLength,
+      contentType: response.ContentType,
+      acceptRanges: response.AcceptRanges,
+    };
+  }
+
   async downloadFile(key: string, destPath: string): Promise<void> {
     const body = await this.getObject(key);
     if (body instanceof Readable) {
@@ -118,7 +134,11 @@ export class StorageService {
       UploadId: uploadId,
       PartNumber: partNumber,
     });
-    return getSignedUrl(this.s3Client, command, { expiresIn });
+    let url = await getSignedUrl(this.s3Client, command, { expiresIn });
+    if (this.config.publicEndpoint && url.startsWith(this.config.endpoint)) {
+      url = url.replace(this.config.endpoint, this.config.publicEndpoint);
+    }
+    return url;
   }
 
   async completeMultipartUpload(
