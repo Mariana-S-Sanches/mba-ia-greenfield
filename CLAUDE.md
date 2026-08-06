@@ -24,8 +24,18 @@ See `docs/diagrams/software-arch.mermaid` for the full diagram. Key containers:
 - **Database** (PostgreSQL) → users, channels, videos, comments, likes
 - **Object Storage** (MinIO) → video files and thumbnails, accessible via S3 API and Presigned URLs
 - **Message Queue** (Redis / BullMQ) → asynchronous video processing job queue
-- **Video Worker** (FFmpeg / BullMQ Processor) → nested inside Nest.js API as a processor, downloads videos, generates thumbnails and extracts duration
+- **Video Worker** (FFmpeg / BullMQ Processor) → nested inside Nest.js API as a processor, downloads videos, generates thumbnails and extracts duration. (FFmpeg is installed in `Dockerfile.dev`)
 - **Email Service** (SMTP) → account confirmation and password recovery
+
+### Core Endpoints
+
+- **Videos Module**:
+  - `POST /videos`: Create a video (initiates multipart upload)
+  - `GET /videos/:referenceId/parts/:partNumber`: Get presigned URL for upload part
+  - `POST /videos/:referenceId/complete`: Complete multipart upload
+  - `GET /videos/:referenceId`: Get video metadata
+  - `GET /videos/:referenceId/stream`: Stream video (supports HTTP 206 Partial Content)
+  - `GET /videos/:referenceId/download`: Download video file
 
 ## Docker Networking
 
@@ -36,7 +46,7 @@ Inside a container, `localhost` refers to the container itself, not the host mac
 - **Correct:** `DB_HOST=db` (the Compose service name)
 - **Wrong:** `DB_HOST=localhost`
 
-This applies to all environment variables, configuration files, and code that references service hosts.
+For Object Storage presigned URLs, we use `MINIO_ENDPOINT=minio` for internal Docker communication, and `MINIO_PUBLIC_ENDPOINT=localhost` (or actual public IP/domain) to replace the host in generated presigned URLs sent to the external client.
 
 ## Working Principles
 

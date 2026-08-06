@@ -25,7 +25,11 @@
   - Ação: Finaliza o S3 Multipart Upload usando as ETags devolvidas, transita status para `PROCESSING`, publica job no BullMQ.
   - Resposta: Confirmação.
 - `GET /videos/:id`: Público ou Autenticado. 
-  - Ação: Retorna dados do vídeo, caso esteja READY gera Presigned URL de tempo curto (HTTP 206 suportado nativamente pelo storage).
+  - Ação: Retorna metadados do vídeo (título, status, duração, etc).
+- `GET /videos/:id/stream`: Público ou Autenticado.
+  - Ação: Stream de vídeo, com suporte ao Header HTTP 206 `Range` consultando o S3.
+- `GET /videos/:id/download`: Público ou Autenticado.
+  - Ação: Retorna stream completo com header `Content-Disposition: attachment`.
 - `GET /videos`: Paginação de vídeos (filtráveis por channelId).
 
 ### 3. Authorization Matrix
@@ -37,6 +41,20 @@
 - **Queue:** `video-processing`
 - **Job Name:** `extract-metadata-and-thumbnail`
 - **Payload:** `{ videoId: string }` (O Worker consultará o banco para buscar a `fileKey`).
+
+### 5. Error Catalog
+| Error Code | Description |
+|---|---|
+| `VIDEO_NOT_FOUND` | O vídeo solicitado não existe ou o ID é inválido. |
+| `INVALID_UPLOAD_STATE` | Tentativa de concluir ou acessar um vídeo em estado inconsistente (ex: tentar finalizar um vídeo que não está em DRAFT). |
+| `STORAGE_UPLOAD_ERROR` | Falha na comunicação com o MinIO/S3 durante a geração de URL ou finalização do multipart upload. |
+| `FFMPEG_PROCESSING_ERROR` | Erro ao extrair thumbnail ou metadados pelo worker (ex: formato inválido). |
+| `UNAUTHORIZED_VIDEO_ACCESS` | Tentativa de acessar, baixar ou alterar um vídeo sem possuir as devidas permissões ou ser o dono do canal (quando aplicável). |
+| `INVALID_RANGE_HEADER` | O formato do cabeçalho Range para o stream HTTP 206 é inválido ou excede o tamanho do arquivo. |
+
+### 6. Dependency Map
+Fluxo de implementação sugerido (ordem de execução e dependência):
+`SI-03.1 (Infra)` ➔ `SI-03.2 (DB/Entity)` ➔ `SI-03.3 (Storage)` ➔ `SI-03.4 (API/Orquestração)` ➔ `SI-03.5 (Worker/FFmpeg)` ➔ `SI-03.6 (Resiliência/E2E)`
 
 ---
 
